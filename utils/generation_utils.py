@@ -50,19 +50,21 @@ def get_config_val(section, key, env_var, default=""):
     return val or default
 
 # Initialize clients lazily or with robust defaults
+project_id = get_config_val("google_cloud", "project_id", "GOOGLE_CLOUD_PROJECT", "")
+location = get_config_val("google_cloud", "location", "GOOGLE_CLOUD_LOCATION", "global")
+
 try:
     import google.auth
     creds, _ = google.auth.default()
     if not hasattr(creds, "service_account_email"):
         print(f"DEBUG: Running with credentials: {type(creds)}")
-    project_id = get_config_val("google_cloud", "project_id", "GOOGLE_CLOUD_PROJECT", "")
-    location = get_config_val("google_cloud", "location", "GOOGLE_CLOUD_LOCATION", "global")
     print(f"DEBUG: Initialized Gemini Client with Project: {project_id}, Location: {location}")
-    
+
     # Try Vertex AI first (preferred for Cloud Run)
     gemini_client = genai.Client(vertexai=True, project=project_id, location=location)
-except ValueError:
+except Exception as e:
     # Fallback to API Key if Vertex fails (e.g. local dev without ADC)
+    print(f"DEBUG: Vertex init failed ({type(e).__name__}), trying API key fallback...")
     api_key = get_config_val("api_keys", "google_api_key", "GOOGLE_API_KEY", "")
     if api_key:
         gemini_client = genai.Client(api_key=api_key)
